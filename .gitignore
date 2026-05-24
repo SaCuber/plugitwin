@@ -1,0 +1,19 @@
+# Build outputs
+build/
+out/
+*.exe
+*.obj
+*.pdb
+
+# Editor / IDE
+.vs/
+.vscode/
+*.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Markdown except readme
+*.md
+!README.md
