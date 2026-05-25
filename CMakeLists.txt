@@ -16,8 +16,8 @@ add_subdirectory(external/JUCE)
 
 juce_add_gui_app(PlugitWin
     PRODUCT_NAME "PlugitWin"
-    COMPANY_NAME "Santiago Roldão"
-    VERSION "0.1.1"
+    COMPANY_NAME "SantiagoRoldao"
+    VERSION "0.2.0"
     # TODO: Icon
     # ICON_BIG "${CMAKE_CURRENT_SOURCE_DIR}/resources/icon.png"
 )
