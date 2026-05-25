@@ -205,6 +205,8 @@ namespace plugitwin
 
             // Middle: whatever's left goes to the chain view.
             chainView.setBounds(area.reduced(12, 8));
+
+            repaint();
         }
 
         void setStatusText(const juce::String& text)
@@ -401,6 +403,7 @@ namespace plugitwin
           owner(ownerApp)
     {
 
+        if (auto* peer = getPeer()) peer->setCurrentRenderingEngine(0);
         auto contentPtr = std::make_unique<Content>(ownerApp);
         rawContent = contentPtr.get();
         setContentOwned(contentPtr.release(),  /*resizeToFit*/ false);
@@ -421,5 +424,12 @@ namespace plugitwin
     void MainWindow::closeButtonPressed()
     {
         owner.hideMainWindow();
+    }
+
+    void MainWindow::resized()
+    {
+        juce::DocumentWindow::resized();
+
+        if (auto* c = getContentComponent()) c->repaint();
     }
 }

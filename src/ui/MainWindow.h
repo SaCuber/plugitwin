@@ -17,6 +17,7 @@ namespace plugitwin
 
         void closeButtonPressed() override;
 
+        void resized() override;
     private:
         TrayApplication& owner;
 
