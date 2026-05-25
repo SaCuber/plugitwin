@@ -10,7 +10,7 @@ namespace plugitwin
         // We deliberately don't call addDefaultFormats() (which would also
         // register VST2, AU, LADSPA depending on platform). That keeps our
         // dependency surface small and matches the MVP scope.
-        formatManager.addFormat(new juce::VST3PluginFormat());
+        formatManager.addFormat(std::make_unique<juce::VST3PluginFormat>());
 
         addDefaultFolders();
     }
@@ -113,7 +113,7 @@ namespace plugitwin
             *vst3Format,
             localPath,
             /*recursive*/         true,
-            /*deadMansPedalFile*/ {},
+            /*deadMansPedalFile*/ deadMansPedal,
             /*allowAsync*/        true);
 
         juce::String pluginBeingScanned;
@@ -156,7 +156,7 @@ namespace plugitwin
             *vst3Format,
             searchPaths,
             /*recursive*/         true,
-            /*deadMansPedalFile*/ {},
+            /*deadMansPedalFile*/ deadMansPedal,
             /*allowAsync*/        true);
 
         juce::String pluginBeingScanned;
@@ -214,4 +214,17 @@ namespace plugitwin
 
         return instance;
     }
+    juce::String PluginHost::getKnownPluginsAsXml() const
+    {
+        auto xml = knownPlugins.createXml();
+        if (xml == nullptr) return {};
+        return xml->toString();
+    }
+
+    void PluginHost::restoreKnownPluginsFromXml(const juce::String& xml)
+    {
+        if (xml.isEmpty()) return;
+        if (auto parsed = juce::parseXML(xml)) knownPlugins.recreateFromXml(*parsed);
+    }
+
 }

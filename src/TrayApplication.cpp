@@ -82,6 +82,8 @@ namespace plugitwin
         pluginChain = std::make_unique<PluginChain>(*pluginHost);
 
         audioEngine = std::make_unique<AudioEngine>(*pluginChain);
+
+        loadPersistedState();
         audioEngine->start();
 
         trayIcon = std::make_unique<TrayIcon>(*this);
@@ -92,6 +94,8 @@ namespace plugitwin
 
     void TrayApplication::shutdown()
     {
+        savePersistedState();
+
         mainWindow.reset();
 
         trayIcon.reset();
@@ -116,6 +120,58 @@ namespace plugitwin
         juce::ignoreUnused(commandLine);
         // if the user launches PlugitWin a second time, JUCE forwards the launch to us
         showMainWindow();
+    }
+
+    void TrayApplication::loadPersistedState()
+    {
+        auto& props = settings.getProps();
+
+        {
+            const auto recoveryFile = juce::File::getSpecialLocation(
+                    juce::File::userApplicationDataDirectory).getChildFile("PlugitWin").getChildFile("scanRecovery.txt");
+            
+            recoveryFile.getParentDirectory().createDirectory();
+            pluginHost->setDeadMansPedalFile(recoveryFile);
+
+            pluginHost->loadCustomFoldersFrom(props);
+            pluginHost->restoreKnownPluginsFromXml(props.getValue("knownPlugins", {}));
+        }
+
+        {
+            const auto deviceXml = props.getValue("audioDeviceState", {});
+
+            if (deviceXml.isNotEmpty())
+            {
+                if (auto parsed = juce::parseXML(deviceXml)) {
+                    audioEngine->setSavedDeviceState(std::move(parsed));
+                }
+            }
+        }
+
+        {
+            const auto chainXml = props.getValue("pluginChain", {});
+            if (chainXml.isNotEmpty()) {
+                pluginChain->restoreStateFromXml(chainXml);
+            }
+        }
+    }
+
+    void TrayApplication::savePersistedState()
+    {
+        if (pluginHost == nullptr || pluginChain == nullptr || audioEngine == nullptr) return;
+
+        auto& props = settings.getProps();
+
+        if (auto deviceXml = audioEngine->getDeviceManager().createStateXml()) {
+            props.setValue("audioDeviceState", deviceXml->toString());
+        }
+
+        props.setValue("knownPlugins", pluginHost->getKnownPluginsAsXml());
+        pluginHost->saveCustomFoldersTo(props);
+
+        props.setValue("pluginChain", pluginChain->getStateAsXml());
+
+        settings.saveIfNeeded();
     }
 
     void TrayApplication::showMainWindow()

@@ -4,6 +4,8 @@
 
 #include <memory>
 
+#include "AppSettings.h"
+
 namespace plugitwin
 {
     class AudioEngine;
@@ -38,12 +40,18 @@ namespace plugitwin
         PluginChain&  getPluginChain()  noexcept;
         PluginHost&   getPluginHost()   noexcept;
 
+        void loadPersistedState();
+        void savePersistedState();
+        AppSettings& getSettings() noexcept {return settings;}
+
     private:
         std::unique_ptr<PluginHost>  pluginHost;
         std::unique_ptr<PluginChain> pluginChain;
         std::unique_ptr<AudioEngine> audioEngine;
         std::unique_ptr<TrayIcon>    trayIcon;
         std::unique_ptr<MainWindow>  mainWindow;
+
+        AppSettings settings;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrayApplication)
     };

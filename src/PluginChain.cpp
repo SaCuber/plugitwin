@@ -114,6 +114,109 @@ namespace plugitwin
         notifyListeners();
     }
 
+    juce::String PluginChain::getStateAsXml() const
+    {
+        juce::XmlElement root("PluginChain");
+
+        for (const auto& slot : slots)
+        {
+            if (slot->plugin == nullptr)
+                continue;
+
+            auto* node = root.createNewChildElement("Plugin");
+
+            const auto desc = slot->plugin->getPluginDescription();
+
+            node->setAttribute("formatName",       desc.pluginFormatName);
+            node->setAttribute("fileOrIdentifier", desc.fileOrIdentifier);
+            node->setAttribute("uniqueId",         (int) desc.uniqueId);
+            node->setAttribute("displayName",      slot->displayName);
+            node->setAttribute("muted",            slot->muted.load(std::memory_order_relaxed));
+
+            // Plugin's internal state: parameters, current preset, etc.
+            juce::MemoryBlock state;
+            slot->plugin->getStateInformation(state);
+
+            if (state.getSize() > 0)
+                node->setAttribute("state", state.toBase64Encoding());
+        }
+
+        return root.toString();
+    }
+
+    void PluginChain::restoreStateFromXml(const juce::String& xml)
+    {
+        if (xml.isEmpty()) return;
+
+        auto parsed = juce::parseXML(xml);
+        if (parsed == nullptr || ! parsed->hasTagName("PluginChain"))
+            return;
+
+        // Clear the existing chain. We move the slots out and let them die at
+        // end of scope; this matches how removePlugin() works.
+        slots.clear();
+        publishSnapshot();
+
+        const auto known = host.getKnownPlugins();
+        int restored = 0;
+        int missing  = 0;
+
+        for (auto* node : parsed->getChildWithTagNameIterator("Plugin"))
+        {
+            const auto formatName = node->getStringAttribute("formatName");
+            const auto fileOrId   = node->getStringAttribute("fileOrIdentifier");
+            const auto uniqueId   = node->getIntAttribute("uniqueId");
+            const bool muted      = node->getBoolAttribute("muted", false);
+            const auto stateB64   = node->getStringAttribute("state");
+
+            // Find a matching PluginDescription in known plugins.
+            const juce::PluginDescription* match = nullptr;
+            for (const auto& d : known)
+            {
+                if (d.pluginFormatName  == formatName
+                    && d.fileOrIdentifier == fileOrId
+                    && (int) d.uniqueId   == uniqueId)
+                {
+                    match = &d;
+                    break;
+                }
+            }
+
+            if (match == nullptr)
+            {
+                ++missing;
+                DBG("PluginChain: skipping unknown plugin on restore: "
+                    << formatName << " / " << fileOrId);
+                continue;
+            }
+
+            const auto id = addPlugin(*match);
+            if (id.isNull())
+            {
+                ++missing;
+                continue;
+            }
+
+            if (stateB64.isNotEmpty())
+            {
+                if (auto* inst = getPluginInstance(id))
+                {
+                    juce::MemoryBlock state;
+                    if (state.fromBase64Encoding(stateB64))
+                        inst->setStateInformation(state.getData(), (int) state.getSize());
+                }
+            }
+
+            if (muted)
+                setPluginMuted(id, true);
+
+            ++restored;
+        }
+
+        DBG("PluginChain: restored " << restored << " plugin(s), "
+            << missing << " missing/failed");
+    }
+
     void PluginChain::movePlugin(const juce::Uuid& slotId, int newIndex)
     {
         const auto idx = indexOf(slotId);

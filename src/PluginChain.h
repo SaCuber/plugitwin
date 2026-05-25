@@ -59,6 +59,9 @@ namespace plugitwin
 
         juce::AudioPluginInstance* getPluginInstance(const juce::Uuid& slotId) const;
 
+        juce::String getStateAsXml() const;
+        void restoreStateFromXml(const juce::String& xml);
+
         // Subscribe to chain-changed notifications. The UI uses this to
         // rebuild its plugin list when slots are added/removed/reordered.
         // Callback fires on the GUI thread.

@@ -48,7 +48,7 @@ namespace plugitwin
     {
         setUsingNativeTitleBar(true);
 
-        juce::Component* contentComp = plugin.createEditorIfNeeded();
+        juce::Component* contentComp = plugin.createEditorAndMakeActive();
 
         if (contentComp == nullptr)
         {

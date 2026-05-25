@@ -325,6 +325,8 @@ namespace plugitwin
                     else
                         setStatusText("Added \"" + d.name + "\".");
                 });
+            
+                owner.savePersistedState(); //Save :)
         }
 
         void handleSettingsClicked()
@@ -353,7 +355,16 @@ namespace plugitwin
             opts.useNativeTitleBar            = true;
             opts.resizable                    = true;
 
-            opts.launchAsync();
+            auto* dlg = opts.launchAsync();
+
+            if (dlg != nullptr) {
+                juce::Component::SafePointer<Content> safeThis(this);
+                dlg->enterModalState(true, juce::ModalCallbackFunction::create(
+                    [safeThis](int){
+                        if (safeThis != nullptr) safeThis->owner.savePersistedState();
+                    }),
+                true);
+            }
 
             setStatusText("Adjust input/output devices. Close the dialog when done.");
         }

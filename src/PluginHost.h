@@ -29,6 +29,9 @@ namespace plugitwin
         // Persist / restore the custom folder list across runs.
         void saveCustomFoldersTo(juce::PropertiesFile& props) const;
         void loadCustomFoldersFrom(const juce::PropertiesFile& props);
+
+        juce::String getKnownPluginsAsXml() const;
+        void         restoreKnownPluginsFromXml(const juce::String& xml);
         
         juce::Array<juce::File> getCustomFolders() const { return customFolders; }
 
@@ -38,7 +41,8 @@ namespace plugitwin
             const juce::PluginDescription& description,
             double                         sampleRate,
             int                            blockSize);
-
+        
+        void setDeadMansPedalFile(const juce::File& f) { deadMansPedal = f; }
     private:
         void addDefaultFolders();
 
@@ -49,5 +53,7 @@ namespace plugitwin
         juce::FileSearchPath           searchPaths;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHost)
+
+        juce::File deadMansPedal;
     };
 }

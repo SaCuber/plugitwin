@@ -69,6 +69,11 @@ namespace plugitwin
             start();
     }
 
+    void AudioEngine::setSavedDeviceState(std::unique_ptr<juce::XmlElement> xml)
+    {
+        savedDeviceState = std::move(xml);
+    }
+
     AudioDeviceSettings AudioEngine::getSettings() const
     {
         const juce::ScopedLock sl(settingsLock);
@@ -107,6 +112,20 @@ namespace plugitwin
         //Only allow Windows Audio, no support for ASIO or others
         deviceManager.setCurrentAudioDeviceType("Windows Audio", /*treatAsChosen*/ true);
 
+        if (savedDeviceState != nullptr)
+        {
+            const auto error = deviceManager.initialise(
+                /*numInputChannelsNeeded*/  kNumChannels,
+                /*numOutputChannelsNeeded*/ kNumChannels,
+                /*savedState*/              savedDeviceState.get(),
+                /*selectDefaultDeviceOnFailure*/ true);
+
+            // Consume the saved state — only used once at startup.
+            savedDeviceState.reset();
+            return error;
+        }
+
+        // No saved state
         juce::AudioDeviceManager::AudioDeviceSetup setup;
         setup.inputDeviceName    = s.inputDeviceName;
         setup.outputDeviceName   = s.outputDeviceName;

@@ -30,6 +30,8 @@ namespace plugitwin
 
         void applySettings(const AudioDeviceSettings& newSettings);
 
+        void setSavedDeviceState(std::unique_ptr<juce::XmlElement> xml);
+
         AudioDeviceSettings getSettings() const;
 
         juce::StringArray getAvailableInputDevices()  const;
@@ -65,6 +67,8 @@ namespace plugitwin
         mutable juce::CriticalSection settingsLock;
 
         bool running = false;
+
+        std::unique_ptr<juce::XmlElement> savedDeviceState;
 
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AudioEngine)
     };
