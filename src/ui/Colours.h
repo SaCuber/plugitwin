@@ -7,7 +7,7 @@ namespace plugitwin
     class Colours 
     {
         public:
-        // MainUIColour = #1C1E22
+        // MainUIColour = RGB(28,30,34)
         static inline const juce::Colour mainUIColour = juce::Colour::fromRGB(28, 30, 34);
 
         static inline const juce::Colour pluginDockColour = juce::Colour::fromRGB(28, 30, 34);

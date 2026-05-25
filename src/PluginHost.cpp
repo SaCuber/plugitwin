@@ -39,33 +39,141 @@ namespace plugitwin
 
     void PluginHost::addCustomFolder(const juce::File& folder)
     {
-        if (folder.isDirectory())
-            searchPaths.add(folder);
+        if (!folder.isDirectory()) return;
+        
+        // Avoid duplicates
+        for (const auto& existing : customFolders) {
+            if (existing == folder) return;
+        }
+
+        customFolders.add(folder);
+        searchPaths.add(folder);
     }
 
-    int PluginHost::scanForPlugins()
+    void PluginHost::removeCustomFolder(const juce::File& folder)
+    {
+        customFolders.removeAllInstancesOf(folder);
+
+        searchPaths = juce::FileSearchPath();
+        addDefaultFolders();
+        for (const auto& f : customFolders) {
+            searchPaths.add(f);
+        }
+    }
+
+    juce::Array<juce::File> PluginHost::getSearchFolders() const
+    {
+        juce::Array<juce::File> out;
+        for (int i=0; i < searchPaths.getNumPaths(); ++i) out.add(searchPaths[i]);
+        return out;
+    }
+
+    void PluginHost::saveCustomFoldersTo(juce::PropertiesFile& props) const
+    {
+        juce::StringArray paths;
+        for (const auto& f : customFolders) paths.add(f.getFullPathName());
+
+        props.setValue("customPluginFolders", paths.joinIntoString("\n"));
+    }
+
+    void PluginHost::loadCustomFoldersFrom(const juce::PropertiesFile& props)
+    {
+        const auto joined = props.getValue("customPluginsFolder", {});
+        if (joined.isEmpty()) return;
+
+        juce::StringArray paths;
+        paths.addLines(joined);
+
+        for (const auto& p : paths) addCustomFolder(juce::File(p));
+    }
+
+    int PluginHost::scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress)
+    {
+        if (! folder.isDirectory())
+            return knownPlugins.getNumTypes();
+
+        auto* vst3Format = formatManager.getFormat(0);
+        if (vst3Format == nullptr)
+            return knownPlugins.getNumTypes();
+
+        // Build a local FileSearchPath containing only this folder.
+        // We deliberately do NOT touch this->searchPaths.
+        juce::FileSearchPath localPath;
+        localPath.add(folder);
+
+        const auto filesToScan = vst3Format->searchPathsForPlugins(
+            localPath,
+            /*recursive*/ true,
+            /*allowPluginsWhichRequireAsynchronousInstantiation*/ false);
+
+        const int total = filesToScan.size();
+
+        juce::PluginDirectoryScanner scanner(
+            knownPlugins,
+            *vst3Format,
+            localPath,
+            /*recursive*/         true,
+            /*deadMansPedalFile*/ {},
+            /*allowAsync*/        true);
+
+        juce::String pluginBeingScanned;
+        int scanned = 0;
+
+        if (onProgress) onProgress(0, total, {});
+
+        while (scanner.scanNextFile(/*dontRescanIfAlreadyInList*/ true,
+                                    pluginBeingScanned))
+        {
+            ++scanned;
+            if (onProgress)
+                onProgress(scanned, total, pluginBeingScanned);
+        }
+
+        if (onProgress) onProgress(total, total, {});
+        return knownPlugins.getNumTypes();
+    }
+
+    int PluginHost::scanForPlugins(ScanProgressFn onProgress)
     {
         // The VST3 format object knows how to recognise a VST3 file and
         // extract its descriptions. We ask it to walk our search paths.
         auto* vst3Format = formatManager.getFormat(0);   // we only registered one
         if (vst3Format == nullptr)
             return knownPlugins.getNumTypes();
+        
 
+        // Collect candidate files up-front so we have a meaningful "total"
+        // for the progress bar. JUCE's scanner walks lazily otherwise.
+        const auto filesToScan = vst3Format->searchPathsForPlugins(
+        searchPaths,
+        /*recursive*/             true,
+        /*allowPluginsWhichRequireAsynchronousInstantiation*/ false);
+        
+        const int total = filesToScan.size();
+        
         juce::PluginDirectoryScanner scanner(
             knownPlugins,
             *vst3Format,
             searchPaths,
             /*recursive*/         true,
             /*deadMansPedalFile*/ {},
-            /*allowAsync*/        false);
+            /*allowAsync*/        true);
 
         juce::String pluginBeingScanned;
-        while (scanner.scanNextFile(/*dontRescanIfAlreadyInList*/ true,
-                                    pluginBeingScanned))
+        int scanned = 0;
+
+        // Report initial state so the UI can switch to "0 / N".
+        if (onProgress) onProgress(0, total, {});
+
+
+        while (scanner.scanNextFile(/*dontRescanIfAlreadyInList*/ true, pluginBeingScanned))
         {
-            // TODO: Add visual progress indicator
+            ++scanned;
+
+            if (onProgress) onProgress(scanned, total, pluginBeingScanned);
         }
 
+        if (onProgress) onProgress(total, total, {});
         return knownPlugins.getNumTypes();
     }
 
