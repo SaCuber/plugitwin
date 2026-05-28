@@ -51,7 +51,6 @@ target_compile_definitions(PlugitWin PRIVATE
     JUCE_ASIO=0
     JUCE_USE_CURL=0
     JUCE_WEB_BROWSER=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0
     JUCE_REPORT_APP_USAGE=0
 )
 
