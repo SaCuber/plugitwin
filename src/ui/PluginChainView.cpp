@@ -26,7 +26,7 @@ namespace plugitwin
         nameLabel.setFont(juce::Font(juce::FontOptions(15.0f, juce::Font::bold)));
         addAndMakeVisible(nameLabel);
 
-        muteButton.setButtonText("Mute");
+        muteButton.setButtonText("Bypass");
         muteButton.setColour(juce::Label::textColourId, Colours::pluginTextColour);
         muteButton.setClickingTogglesState(true);
         muteButton.onClick = [this] { handleMuteClicked(); };
@@ -100,7 +100,7 @@ namespace plugitwin
             {
                 nameLabel.setText(info.displayName, juce::dontSendNotification);
                 muteButton.setToggleState(info.muted, juce::dontSendNotification);
-                muteButton.setButtonText(info.muted ? "Muted" : "Mute");
+                muteButton.setButtonText(info.muted ? "Bypassed" : "Bypass");
                 return;
             }
         }
@@ -120,7 +120,7 @@ namespace plugitwin
         // TODO: Check this out
         // setClickingTogglesState already toggled muteButton's visual state.
         chain.setPluginMuted(slotId, muteButton.getToggleState());
-        muteButton.setButtonText(muteButton.getToggleState() ? "Muted" : "Mute");
+        muteButton.setButtonText(muteButton.getToggleState() ? "Bypassed" : "Bypass");
     }
 
     void PluginRowComponent::handleMoveUpClicked()
