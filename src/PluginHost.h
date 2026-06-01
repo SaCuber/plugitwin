@@ -17,6 +17,8 @@ namespace plugitwin
         
         void setScanScratchDirectory(const juce::File& dir) {scanScratchDir = dir;}
 
+        void addDefaultFolders();
+
         int scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress = {});                            
         int scanForPlugins(ScanProgressFn onProgress = {});
         PluginHost();
@@ -34,7 +36,7 @@ namespace plugitwin
 
         // Persist / restore the custom folder list across runs.
         void saveCustomFoldersTo(juce::PropertiesFile& props) const;
-        void loadCustomFoldersFrom(const juce::PropertiesFile& props);
+        bool loadCustomFoldersFrom(const juce::PropertiesFile& props);
 
         juce::String getKnownPluginsAsXml() const;
         void         restoreKnownPluginsFromXml(const juce::String& xml);
@@ -50,8 +52,6 @@ namespace plugitwin
         
         void setDeadMansPedalFile(const juce::File& f) { deadMansPedal = f; }
     private:
-        void addDefaultFolders();
-
         int runScanLoop(juce::FileSearchPath& paths,
                         ScanProgressFn onProgress);
 

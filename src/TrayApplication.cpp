@@ -136,7 +136,8 @@ namespace plugitwin
             recoveryFile.getParentDirectory().createDirectory();
             pluginHost->setDeadMansPedalFile(recoveryFile);
 
-            pluginHost->loadCustomFoldersFrom(props);
+            bool customFolders = pluginHost->loadCustomFoldersFrom(props);
+            if (customFolders) pluginHost->addDefaultFolders();
             pluginHost->restoreKnownPluginsFromXml(props.getValue("knownPlugins", {}));
         }
 

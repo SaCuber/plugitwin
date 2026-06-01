@@ -12,10 +12,8 @@ namespace plugitwin
         // returns 1 and we can scan/load VST3 plugins.
         //
         // We deliberately don't call addDefaultFormats() (which would also
-        // register VST2, AU, LADSPA depending on platform). That keeps our
-        // dependency surface small and matches the MVP scope.
+        // register VST2, AU, LADSPA depending on platform)
         formatManager.addFormat(std::make_unique<juce::VST3PluginFormat>());
-        addDefaultFolders();
     }
 
     PluginHost::~PluginHost() = default;
@@ -56,11 +54,14 @@ namespace plugitwin
     void PluginHost::removeCustomFolder(const juce::File& folder)
     {
         customFolders.removeAllInstancesOf(folder);
-
         searchPaths = juce::FileSearchPath();
-        addDefaultFolders();
-        for (const auto& f : customFolders) {
-            searchPaths.add(f);
+
+        if (customFolders.size() == 0) {
+            addDefaultFolders();
+        } else {
+            for (const auto& f : customFolders) {
+                searchPaths.add(f);
+            }
         }
     }
 
@@ -79,15 +80,16 @@ namespace plugitwin
         props.setValue("customPluginFolders", paths.joinIntoString("\n"));
     }
 
-    void PluginHost::loadCustomFoldersFrom(const juce::PropertiesFile& props)
+    bool PluginHost::loadCustomFoldersFrom(const juce::PropertiesFile& props)
     {
         const auto joined = props.getValue("customPluginFolders", {});
-        if (joined.isEmpty()) return;
+        if (joined.isEmpty()) return false;
 
         juce::StringArray paths;
         paths.addLines(joined);
 
         for (const auto& p : paths) addCustomFolder(juce::File(p));
+        return true;
     }
 
     void PluginHost::clearKnownPlugins()

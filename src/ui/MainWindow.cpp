@@ -140,9 +140,7 @@ namespace plugitwin
                     if (persist)
                     {
                         host.addCustomFolder(folder);
-                        safeThis->runScan([&host](PluginHost::ScanProgressFn cb){return host.scanForPlugins(cb); },
-                            "Added folder: " + folder.getFullPathName()
-                            + " — starting full scan...");
+                        safeThis->setStatusText("Added folder: " + folder.getFullPathName());
                     }
                     else
                     {
