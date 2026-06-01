@@ -81,7 +81,7 @@ namespace plugitwin
 
     void PluginHost::loadCustomFoldersFrom(const juce::PropertiesFile& props)
     {
-        const auto joined = props.getValue("customPluginFolder", {});
+        const auto joined = props.getValue("customPluginFolders", {});
         if (joined.isEmpty()) return;
 
         juce::StringArray paths;
@@ -160,11 +160,12 @@ namespace plugitwin
             const auto startTime = juce::Time::getMillisecondCounter();
 
             while (!finished) {
-                if (child.waitForProcessToFinish(100)) finished = true; break;
-                if (scanCancelled.load()) child.kill(); break;
+                if (child.waitForProcessToFinish(100)) {finished = true; break;}
+                if (scanCancelled.load()) {child.kill(); child.waitForProcessToFinish(2000); break;}
                 if ((int) (juce::Time::getMillisecondCounter() - startTime) >= kPluginScanTimeoutMs) {
                     DBG("PluginHost: scan worker timed out");
                     child.kill();
+                    child.waitForProcessToFinish(2000);
                     break;
                 }
             }
