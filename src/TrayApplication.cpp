@@ -79,10 +79,13 @@ namespace plugitwin
 
         pluginHost = std::make_unique<PluginHost>();
 
+        const auto scratchDir = juce::File::getSpecialLocation(
+            juce::File::userApplicationDataDirectory).getChildFile("PlugitWin").getChildFile("scanScratch");
+
         pluginChain = std::make_unique<PluginChain>(*pluginHost);
 
         audioEngine = std::make_unique<AudioEngine>(*pluginChain);
-
+        
         loadPersistedState();
         audioEngine->start();
 

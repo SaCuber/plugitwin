@@ -226,8 +226,12 @@ namespace plugitwin
         
         void runScan(std::function<int(PluginHost::ScanProgressFn)> scanFn, const juce::String& startingMessage)
         {
-            scanButton.setEnabled(false);
+            scanInProgress = true;
+            scanButton.setButtonText("Stop Scanning");
+            scanButton.setEnabled(true);
             addButton.setEnabled(false);
+            //settingsButton.setEnabled(false); MAYBE
+
             scanProgress = 0.0;
             progressBar.setVisible(true);
             setStatusText(startingMessage);
@@ -267,11 +271,20 @@ namespace plugitwin
                 {
                     if (safeThis == nullptr) return;
 
+                    const bool wasCancelled = safeThis->owner.getPluginHost().isScanCancelled();
+
                     safeThis->scanProgress = 1.0;
                     safeThis->progressBar.setVisible(false);
+                    safeThis->scanInProgress = false;
+                    safeThis->scanButton.setButtonText("Scan plugins");
                     safeThis->scanButton.setEnabled(true);
                     safeThis->addButton.setEnabled(true);
-                    if (count > 0) {
+                    safeThis->settingsButton.setEnabled(true);
+
+                    if (wasCancelled) {
+                        safeThis->setStatusText("Scan stopped. " + juce::String(count)
+                            + "plugin(s) registered so far.");
+                    } else if (count > 0) {
                         safeThis->setStatusText("Scan complete. " + juce::String(count)
                             + " plugin(s) registered and ready to be added.");
                     } else {
@@ -285,6 +298,17 @@ namespace plugitwin
         void handleScanClicked()
         {
             auto& host = owner.getPluginHost();
+
+            if (scanInProgress)
+            {
+                //Stop request
+                host.requestScanStop();
+                scanButton.setEnabled(false);
+                scanButton.setButtonText("Stopping...");
+                setStatusText("Stop requested - finishing current plugin...");
+                return;
+            }
+
             runScan([&host](PluginHost::ScanProgressFn cb) { return host.scanForPlugins(cb); }, "Scanning...");
         }
 
@@ -377,7 +401,8 @@ namespace plugitwin
         PluginChainView   chainView;
         juce::Label       statusLabel;
 
-        double            scanProgress { 0.0 };  // 0.0 .. 1.0
+        bool scanInProgress {false};
+        double            scanProgress {0.0};  // 0.0 .. 1.0
         juce::ProgressBar progressBar { scanProgress };
 
         // Cached layout regions so paint() can draw separators at the

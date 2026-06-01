@@ -25,6 +25,8 @@ juce_add_gui_app(PlugitWin
 juce_generate_juce_header(PlugitWin)
 
 target_sources(PlugitWin PRIVATE
+    src/PluginScanWorker.h
+    src/PluginScanWorker.cpp
     src/Main.cpp
     src/TrayApplication.h
     src/TrayApplication.cpp

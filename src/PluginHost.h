@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 
+#include <atomic>
 #include <memory>
 
 namespace plugitwin
@@ -13,17 +14,22 @@ namespace plugitwin
                                                 int total,
                                                 const juce::String& currentName)>;
         
+        
+        void setScanScratchDirectory(const juce::File& dir) {scanScratchDir = dir;}
 
         int scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress = {});                            
         int scanForPlugins(ScanProgressFn onProgress = {});
         PluginHost();
         ~PluginHost();
 
+        void requestScanStop() noexcept {scanCancelled.store(true);}
+        bool isScanCancelled() const noexcept {return scanCancelled.load();}
+
+        void clearKnownPlugins();
+
         juce::Array<juce::File> getSearchFolders() const;
 
         void addCustomFolder(const juce::File& folder);
-
-        // Remove a previously-added custom folder. No-op if not present.
         void removeCustomFolder(const juce::File& folder);
 
         // Persist / restore the custom folder list across runs.
@@ -46,14 +52,20 @@ namespace plugitwin
     private:
         void addDefaultFolders();
 
+        int runScanLoop(juce::FileSearchPath& paths,
+                        ScanProgressFn onProgress);
+
         juce::Array<juce::File> customFolders;
 
         juce::AudioPluginFormatManager formatManager;
         juce::KnownPluginList          knownPlugins;
         juce::FileSearchPath           searchPaths;
 
+        std::atomic<bool> scanCancelled {false};
+
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PluginHost)
 
         juce::File deadMansPedal;
+        juce::File scanScratchDir;
     };
 }

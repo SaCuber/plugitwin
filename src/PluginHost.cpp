@@ -1,7 +1,11 @@
 #include "PluginHost.h"
 
 namespace plugitwin
-{
+{   
+    namespace {
+        constexpr int kPluginScanTimeoutMs = 30000;
+    }
+
     PluginHost::PluginHost()
     {
         // Register the VST3 format. After this, formatManager.getNumFormats()
@@ -11,7 +15,6 @@ namespace plugitwin
         // register VST2, AU, LADSPA depending on platform). That keeps our
         // dependency surface small and matches the MVP scope.
         formatManager.addFormat(std::make_unique<juce::VST3PluginFormat>());
-
         addDefaultFolders();
     }
 
@@ -78,7 +81,7 @@ namespace plugitwin
 
     void PluginHost::loadCustomFoldersFrom(const juce::PropertiesFile& props)
     {
-        const auto joined = props.getValue("customPluginsFolder", {});
+        const auto joined = props.getValue("customPluginFolder", {});
         if (joined.isEmpty()) return;
 
         juce::StringArray paths;
@@ -87,94 +90,130 @@ namespace plugitwin
         for (const auto& p : paths) addCustomFolder(juce::File(p));
     }
 
-    int PluginHost::scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress)
+    void PluginHost::clearKnownPlugins()
     {
-        if (! folder.isDirectory())
-            return knownPlugins.getNumTypes();
+        knownPlugins.clear();
+    }
 
+    int PluginHost::runScanLoop(juce::FileSearchPath& paths,
+                                ScanProgressFn onProgress)
+    {
         auto* vst3Format = formatManager.getFormat(0);
-        if (vst3Format == nullptr)
-            return knownPlugins.getNumTypes();
-
-        // Build a local FileSearchPath containing only this folder.
-        // We deliberately do NOT touch this->searchPaths.
-        juce::FileSearchPath localPath;
-        localPath.add(folder);
+        if (vst3Format == nullptr) return knownPlugins.getNumTypes();
 
         const auto filesToScan = vst3Format->searchPathsForPlugins(
-            localPath,
+            paths,
             /*recursive*/ true,
-            /*allowPluginsWhichRequireAsynchronousInstantiation*/ false);
-
+            /*allowPluginsWhichRequireAsynchornousInstantiation*/ false);
+        
         const int total = filesToScan.size();
-
-        juce::PluginDirectoryScanner scanner(
-            knownPlugins,
-            *vst3Format,
-            localPath,
-            /*recursive*/         true,
-            /*deadMansPedalFile*/ deadMansPedal,
-            /*allowAsync*/        true);
-
-        juce::String pluginBeingScanned;
-        int scanned = 0;
-
         if (onProgress) onProgress(0, total, {});
 
-        while (scanner.scanNextFile(/*dontRescanIfAlreadyInList*/ true,
-                                    pluginBeingScanned))
-        {
-            ++scanned;
-            if (onProgress)
-                onProgress(scanned, total, pluginBeingScanned);
+        const auto selfExe = juce::File::getSpecialLocation(
+            juce::File::currentExecutableFile);
+        
+        juce::File scratchDir = scanScratchDir;
+        if (scratchDir == juce::File{} || !scratchDir.isDirectory()) {
+            scratchDir.createDirectory();
+            if (!scratchDir.isDirectory()) scratchDir = juce::File::getSpecialLocation(juce::File::tempDirectory);
         }
+
+        int scanned = 0;
+
+        for (const auto& vst3Path : filesToScan)
+        {
+            if (scanCancelled.load()) break;
+
+            ++scanned;
+            if (onProgress) onProgress(scanned, total, vst3Path);
+
+            bool alreadyKnown = false;
+            for (const auto& known : knownPlugins.getTypes())
+            {
+                if (juce::File(known.fileOrIdentifier) == juce::File(vst3Path)) {
+                    alreadyKnown = true;
+                    break;
+                }
+            }
+            if (alreadyKnown) continue;
+
+            if (deadMansPedal != juce::File{}) deadMansPedal.replaceWithText(vst3Path);
+
+            const auto outFile = scratchDir.getChildFile(
+                "scan_" + juce::String(juce::Uuid().toString()) + ".xml");
+            
+            juce::StringArray args;
+            args.add(selfExe.getFullPathName());
+            args.add("--scan-vst3");
+            args.add(vst3Path);
+            args.add("--scan-out");
+            args.add(outFile.getFullPathName());
+
+            juce::ChildProcess child;
+            if (!child.start(args, 0)) {
+                DBG("PluginHost: failed to spawn a scan worker oops");
+                outFile.deleteFile();
+                continue;
+            }
+
+            bool finished = false;
+            const auto startTime = juce::Time::getMillisecondCounter();
+
+            while (!finished) {
+                if (child.waitForProcessToFinish(100)) finished = true; break;
+                if (scanCancelled.load()) child.kill(); break;
+                if ((int) (juce::Time::getMillisecondCounter() - startTime) >= kPluginScanTimeoutMs) {
+                    DBG("PluginHost: scan worker timed out");
+                    child.kill();
+                    break;
+                }
+            }
+
+            if (!finished) {
+                outFile.deleteFile();
+                continue;
+            }
+            if (child.getExitCode() != 0) {
+                outFile.deleteFile();
+                continue;
+            }
+
+            const auto output = outFile.loadFileAsString();
+            outFile.deleteFile();
+
+            if (output.isEmpty()) continue;
+
+            auto xml = juce::parseXML(output);
+            if (xml == nullptr || !xml->hasTagName("PLUGIN_SCAN_RESULT")) continue;
+
+            for (auto* descXml : xml->getChildIterator()) {
+                juce::PluginDescription desc;
+                if (desc.loadFromXml(*descXml)) knownPlugins.addType(desc);
+            }
+        }
+
+        if (deadMansPedal != juce::File{} && deadMansPedal.existsAsFile()) deadMansPedal.deleteFile();
 
         if (onProgress) onProgress(total, total, {});
         return knownPlugins.getNumTypes();
     }
 
+    int PluginHost::scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress)
+    {
+        scanCancelled.store(false);
+
+        if (!folder.isDirectory()) return knownPlugins.getNumTypes();
+        
+        juce::FileSearchPath localPath;
+        localPath.add(folder);
+
+        return runScanLoop(searchPaths, std::move(onProgress));
+    }
+
     int PluginHost::scanForPlugins(ScanProgressFn onProgress)
     {
-        // The VST3 format object knows how to recognise a VST3 file and
-        // extract its descriptions. We ask it to walk our search paths.
-        auto* vst3Format = formatManager.getFormat(0);   // we only registered one
-        if (vst3Format == nullptr)
-            return knownPlugins.getNumTypes();
-        
-
-        // Collect candidate files up-front so we have a meaningful "total"
-        // for the progress bar. JUCE's scanner walks lazily otherwise.
-        const auto filesToScan = vst3Format->searchPathsForPlugins(
-        searchPaths,
-        /*recursive*/             true,
-        /*allowPluginsWhichRequireAsynchronousInstantiation*/ false);
-        
-        const int total = filesToScan.size();
-        
-        juce::PluginDirectoryScanner scanner(
-            knownPlugins,
-            *vst3Format,
-            searchPaths,
-            /*recursive*/         true,
-            /*deadMansPedalFile*/ deadMansPedal,
-            /*allowAsync*/        true);
-
-        juce::String pluginBeingScanned;
-        int scanned = 0;
-
-        // Report initial state so the UI can switch to "0 / N".
-        if (onProgress) onProgress(0, total, {});
-
-
-        while (scanner.scanNextFile(/*dontRescanIfAlreadyInList*/ true, pluginBeingScanned))
-        {
-            ++scanned;
-
-            if (onProgress) onProgress(scanned, total, pluginBeingScanned);
-        }
-
-        if (onProgress) onProgress(total, total, {});
-        return knownPlugins.getNumTypes();
+        scanCancelled.store(false);
+        return runScanLoop(searchPaths, std::move(onProgress));
     }
 
     juce::Array<juce::PluginDescription> PluginHost::getKnownPlugins() const
