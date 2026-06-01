@@ -17,7 +17,7 @@ namespace plugitwin
         
         void setScanScratchDirectory(const juce::File& dir) {scanScratchDir = dir;}
 
-        void addDefaultFolders();
+        void addDefaultFolders(bool showInCustom = false);
 
         int scanFolderOnce(const juce::File& folder, ScanProgressFn onProgress = {});                            
         int scanForPlugins(ScanProgressFn onProgress = {});

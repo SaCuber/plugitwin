@@ -18,7 +18,7 @@ namespace plugitwin
 
     PluginHost::~PluginHost() = default;
 
-    void PluginHost::addDefaultFolders()
+    void PluginHost::addDefaultFolders(bool showInCustom = false)
     {
         // Standard Windows VST3 locations. JUCE's VST3PluginFormat also
         // knows about these internally, but we add them explicitly so they
@@ -26,8 +26,14 @@ namespace plugitwin
 
         const auto programFiles = juce::File::getSpecialLocation(
             juce::File::globalApplicationsDirectory);
+        
+        const auto commonFiles = programFiles.getChildFile("Common Files/VST3");
 
-        searchPaths.add(programFiles.getChildFile("Common Files/VST3"));
+        if (showInCustom) {
+            addCustomFolder(commonFiles);
+        } else {
+            searchPaths.add(commonFiles);
+        }
 
         // Also check the user-local VST3 folder if it exists.
         const auto userVst3 = juce::File::getSpecialLocation(
@@ -35,7 +41,11 @@ namespace plugitwin
             .getChildFile("VST3");
 
         if (userVst3.isDirectory())
-            searchPaths.add(userVst3);
+            if (showInCustom) {
+                addCustomFolder(userVst3);
+            } else {
+                searchPaths.add(userVst3);
+            }
     }
 
     void PluginHost::addCustomFolder(const juce::File& folder)

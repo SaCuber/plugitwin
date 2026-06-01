@@ -82,6 +82,7 @@ namespace plugitwin
             menu.addSeparator();
             menu.addItem(1, "Add custom folder...");
             menu.addItem(2, "Scan a folder once (don't save)...");
+            menu.addItem(3, "Add default VST3 folders");
 
             const auto options = juce::PopupMenu::Options()
                 .withTargetComponent(&scanButton);
@@ -101,6 +102,10 @@ namespace plugitwin
                 else if (result == 2)
                 {
                     safeThis->pickFolderAndAdd(/*persist*/ false);
+                }
+                else if (result == 3)
+                {
+                    host.addDefaultFolders(true);
                 }
                 else if (result >= 1000)
                 {
