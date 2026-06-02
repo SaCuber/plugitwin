@@ -34,6 +34,8 @@ namespace plugitwin
 
         void hideMainWindow();
 
+        void deleteAllConfigs();
+
         void requestQuit();
 
         AudioEngine&  getAudioEngine()  noexcept;

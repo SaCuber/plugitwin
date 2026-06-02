@@ -34,6 +34,8 @@ namespace plugitwin
         void addCustomFolder(const juce::File& folder);
         void removeCustomFolder(const juce::File& folder);
 
+        void clearCustomFolders();
+
         // Persist / restore the custom folder list across runs.
         void saveCustomFoldersTo(juce::PropertiesFile& props) const;
         bool loadCustomFoldersFrom(const juce::PropertiesFile& props);

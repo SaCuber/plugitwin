@@ -114,6 +114,13 @@ namespace plugitwin
         notifyListeners();
     }
 
+    void PluginChain::clearPlugins()
+    {
+        slots.clear();
+        publishSnapshot();
+        notifyListeners();
+    }
+
     juce::String PluginChain::getStateAsXml() const
     {
         juce::XmlElement root("PluginChain");

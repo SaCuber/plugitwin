@@ -34,7 +34,7 @@ namespace plugitwin
             addButton.onClick = [this] { handleAddClicked(); };
             addAndMakeVisible(addButton);
 
-            settingsButton.setButtonText("Audio settings");
+            settingsButton.setButtonText("Settings");
             settingsButton.onClick = [this] { handleSettingsClicked(); };
             addAndMakeVisible(settingsButton);
 
@@ -359,23 +359,48 @@ namespace plugitwin
         {
             auto& deviceManager = owner.getAudioEngine().getDeviceManager();
 
-            auto selector = std::make_unique<juce::AudioDeviceSelectorComponent>(
-                deviceManager,
-                /*minInputChannels*/  2,
-                /*maxInputChannels*/  2,
-                /*minOutputChannels*/ 2,
-                /*maxOutputChannels*/ 2,
-                /*showMidiInputOptions*/  false,
-                /*showMidiOutputSelector*/ false,
-                /*showChannelsAsStereoPairs*/ true,
-                /*hideAdvancedOptions*/    false);
+            struct SettingsContent : public juce::Component
+            {
+                SettingsContent(juce::AudioDeviceManager& dm, TrayApplication& app, SafePointer<Content> safeThis)
+                    : owner(app),
+                      selector(dm,
+                            /*minInputChan*/ 2,   /*maxInputChan*/2,
+                            /*minOutChan*/ 2,     /*maxOutChan*/ 2,
+                            /*midiIn*/ false,     /*midiOut*/ false,
+                            /*stereoPairs*/ true, /*hideAdvanced*/ false)
+                {
+                    addAndMakeVisible(selector);
 
-            selector->setSize(480, 360);
+                    resetButton.setButtonText("Reset config");
+                    resetButton.setTooltip("Erase EVERYTHING, BE CAREFUL!");
+                    resetButton.setColour(juce::TextButton::buttonColourId, Colours::resetButtonColour);
+                    resetButton.setColour(juce::TextButton::textColourOffId, Colours::resetButtonOffColour);
+                    resetButton.onClick = [this, safeThis] {owner.deleteAllConfigs(); safeThis->setStatusText("Reset Configs.");};
+                    addAndMakeVisible(resetButton);
+
+                    setSize(480, 410);
+                }
+
+                void resized() override
+                {
+                    auto area = getLocalBounds();
+                    auto bottom = area.removeFromBottom(40).reduced(12,6);
+                    resetButton.setBounds(bottom.removeFromRight(130));
+                    selector.setBounds(area);
+                }
+
+                TrayApplication&                    owner;
+                juce::AudioDeviceSelectorComponent  selector;
+                juce::TextButton                    resetButton;
+            };
+            
+            juce::Component::SafePointer<Content> safeThis(this);
+            auto content = std::make_unique<SettingsContent>(deviceManager, owner, safeThis);
 
             juce::DialogWindow::LaunchOptions opts;
-            opts.dialogTitle                  = "Audio settings";
+            opts.dialogTitle                  = "Settings";
             opts.dialogBackgroundColour       = Colours::settingsDialogBackgroundColour;
-            opts.content.setOwned(selector.release());
+            opts.content.setOwned(content.release());
             opts.componentToCentreAround      = this;
             opts.escapeKeyTriggersCloseButton = true;
             opts.useNativeTitleBar            = true;
@@ -384,7 +409,6 @@ namespace plugitwin
             auto* dlg = opts.launchAsync();
 
             if (dlg != nullptr) {
-                juce::Component::SafePointer<Content> safeThis(this);
                 dlg->enterModalState(true, juce::ModalCallbackFunction::create(
                     [safeThis](int){
                         if (safeThis != nullptr) safeThis->owner.savePersistedState();

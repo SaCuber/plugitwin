@@ -178,6 +178,22 @@ namespace plugitwin
         settings.saveIfNeeded();
     }
 
+    void TrayApplication::deleteAllConfigs()
+    {   
+        if (audioEngine != nullptr) audioEngine->stop();
+
+        pluginChain->clearPlugins();
+        pluginHost->clearKnownPlugins();
+        pluginHost->clearCustomFolders();
+        
+        const auto recoveryFile = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("PlugitWin").getChildFile("scanRecovery.txt");
+        recoveryFile.deleteFile(); // The .settings is handled by the following savePersistedState() call
+
+        savePersistedState();
+
+        if (audioEngine != nullptr) audioEngine->start();
+    }
+
     void TrayApplication::showMainWindow()
     {
         if (mainWindow == nullptr)

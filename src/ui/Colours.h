@@ -15,7 +15,7 @@ namespace plugitwin
         // SeparatorBarColour = #3C4048
         static inline const juce::Colour separatorBarColour = juce::Colour::fromRGB(60, 64, 72);
 
-        //Settings
+        // Settings
         static inline const juce::Colour settingsDialogBackgroundColour = juce::Colour::fromRGB(28, 30, 34);
 
         static inline const juce::Colour titleColour = juce::Colours::white;
@@ -31,5 +31,9 @@ namespace plugitwin
         static inline const juce::Colour pluginChainColour = juce::Colours::grey;
 
         static inline const juce::Colour pluginChainInnerColour = juce::Colour::fromRGB(34, 36, 40);
+
+        // Reset Configs
+        static inline const juce::Colour resetButtonColour = juce::Colour::fromRGB(160, 30, 30);
+        static inline const juce::Colour resetButtonOffColour = juce::Colours::white;
     };
 }

@@ -41,6 +41,8 @@ namespace plugitwin
 
         void removePlugin(const juce::Uuid& slotId);
 
+        void clearPlugins();
+
         void movePlugin(const juce::Uuid& slotId, int newIndex);
 
         void setPluginMuted(const juce::Uuid& slotId, bool shouldBeMuted);
