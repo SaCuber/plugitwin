@@ -286,7 +286,7 @@ namespace plugitwin
 
                     if (wasCancelled) {
                         safeThis->setStatusText("Scan stopped. " + juce::String(count)
-                            + "plugin(s) registered so far.");
+                            + " plugin(s) registered so far.");
                     } else if (count > 0) {
                         safeThis->setStatusText("Scan complete. " + juce::String(count)
                             + " plugin(s) registered and ready to be added.");
