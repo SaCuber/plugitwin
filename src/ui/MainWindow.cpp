@@ -215,6 +215,144 @@ namespace plugitwin
         }
 
     private:
+
+        struct PluginPickerPopup : public juce::Component, private juce::TextEditor::Listener, private juce::ListBoxModel
+        {
+            PluginPickerPopup(juce::Array<juce::PluginDescription> descs, std::function<void(const juce::PluginDescription&)> onPick)
+                : allDescriptions(std::move(descs)),
+                onPicked(std::move(onPick))
+            {
+                searchBox.setTextToShowWhenEmpty("Search Plugins...", Colours::searchBarTextColour);
+                searchBox.addListener(this);
+                searchBox.onReturnKey = [this] {pickCurrent();};
+                searchBox.onEscapeKey = [this] {dismiss();};
+                searchBox.setWantsKeyboardFocus(true);
+                addAndMakeVisible(searchBox);
+
+                list.setModel(this);
+                list.setRowHeight(22);
+                list.setColour(juce::ListBox::backgroundColourId, Colours::mainUIColour);
+                list.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+                addAndMakeVisible(list);
+
+                rebuildFiltered();
+                setSize(320, 360);
+            }
+
+            void resized() override
+            {
+                auto area = getLocalBounds().reduced(4);
+                searchBox.setBounds(area.removeFromTop(26));
+                area.removeFromTop(4);
+                list.setBounds(area);
+            }
+
+            void parentHierarchyChanged() override
+            {
+                if (isShowing() && !searchBox.hasKeyboardFocus(true)) searchBox.grabKeyboardFocus();
+            }
+
+            bool keyPressed(const juce::KeyPress& key) override
+            {
+                if (key == juce::KeyPress::downKey) {moveCurrent(+1); return true;}
+                if (key == juce::KeyPress::upKey) {moveCurrent(-1); return true;}
+                if (key == juce::KeyPress::pageDownKey) {moveCurrent(+8); return true;}
+                if (key == juce::KeyPress::pageUpKey) {moveCurrent(-8); return true;}
+                return false;
+            }
+
+            void mouseMove(const juce::MouseEvent& e) override
+            {
+                updateHoverFromScreenPos(e.getScreenPosition());
+            }
+
+            void mouseExit(const juce::MouseEvent&) override {};
+
+            void textEditorTextChanged(juce::TextEditor&) override
+            {
+                rebuildFiltered();
+            }
+
+            int getNumRows() override {return filtered.size();}
+
+            void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override
+            {
+                if (rowNumber<0 || rowNumber > filtered.size()) return;
+
+                if (rowIsSelected) g.fillAll(Colours::searchHighlightColour);
+
+                g.setColour(Colours::addListItemTextColour);
+                g.setFont((float) height * 0.6f);
+                g.drawText(filtered.getReference(rowNumber).name, 8, 0, width-16, height, juce::Justification::centredLeft, true);
+            }
+
+            void listBoxItemClicked(int row, const juce::MouseEvent&) override {setCurrentRow(row); pickCurrent();}
+
+        private:
+
+            void rebuildFiltered()
+            {
+                const auto query = searchBox.getText().trim().toLowerCase();
+                filtered.clearQuick();
+
+                if (query.isEmpty()) filtered = allDescriptions;
+                else {
+                    for (const auto& d : allDescriptions) {
+                        if (d.name.toLowerCase().contains(query)) filtered.add(d);
+                    }
+                }
+                list.updateContent();
+                setCurrentRow(filtered.isEmpty() ? -1 : 0);
+            }
+
+            void setCurrentRow(int row)
+            {
+                if (row == currentRow) return;
+                currentRow = row;
+                list.selectRow(row, false, true);
+                list.repaint();
+            }
+
+            void moveCurrent(int delta)
+            {
+                if (filtered.isEmpty()) return;
+                int next = juce::jlimit(0, filtered.size() -1, (currentRow < 0 ? 0: currentRow) + delta);
+                setCurrentRow(next);
+            }
+
+            void updateHoverFromScreenPos(juce::Point<int> screenPos)
+            {
+                const auto listLocal = list.getLocalPoint(nullptr, screenPos);
+                if (!list.getLocalBounds().contains(listLocal)) return;
+
+                const int row = list.getRowContainingPosition(listLocal.x, listLocal.y);
+                if (row >= 0) setCurrentRow(row);
+            }
+
+            void pickCurrent()
+            {
+                if (currentRow < 0 || currentRow >= filtered.size()) return;
+                const auto chosen = filtered.getReference(currentRow);
+                auto cb = onPicked;
+                dismiss();
+                if (cb) cb(chosen);
+            }
+
+            void dismiss()
+            {
+                if (auto* box = findParentComponentOfClass<juce::CallOutBox>()) box->dismiss();
+            }
+
+            juce::Array<juce::PluginDescription> allDescriptions;
+            juce::Array<juce::PluginDescription> filtered;
+            std::function<void(const juce::PluginDescription&)> onPicked;
+
+            juce::TextEditor searchBox;
+            juce::ListBox list;
+            int currentRow {-1};
+        };
+
+
         std::unique_ptr<juce::FileChooser> folderChooser;
 
         void mouseDown(const juce::MouseEvent& e) override
@@ -316,7 +454,7 @@ namespace plugitwin
         }
 
         void handleAddClicked()
-        {
+        {   
             auto& host = owner.getPluginHost();
             const auto descriptions = host.getKnownPlugins();
 
@@ -326,33 +464,24 @@ namespace plugitwin
                 return;
             }
 
-            juce::PopupMenu menu;
+            juce::Component::SafePointer<Content> safeThis(this);
 
-            for (int i = 0; i < descriptions.size(); ++i)
-            {
-                const auto& d = descriptions.getReference(i);
-                menu.addItem(i + 1, d.name);
-            }
-
-            const auto options = juce::PopupMenu::Options()
-                .withTargetComponent(&addButton);
-
-            menu.showMenuAsync(options,
-                [this, descriptions](int result)
+            auto picker = std::make_unique<PluginPickerPopup>(descriptions, 
+                [safeThis] (const juce::PluginDescription& d)
                 {
-                    if (result <= 0)
-                        return;
+                    if (safeThis == nullptr) return;
+                    
+                    const auto id = safeThis->owner.getPluginChain().addPlugin(d);
 
-                    const auto& d = descriptions.getReference(result - 1);
-                    const auto id = owner.getPluginChain().addPlugin(d);
+                    if (id.isNull()) safeThis->setStatusText("Failed to load \"" + d.name + "\".");
+                    else safeThis->setStatusText("Added \"" + d.name + "\".");
 
-                    if (id.isNull())
-                        setStatusText("Failed to load \"" + d.name + "\".");
-                    else
-                        setStatusText("Added \"" + d.name + "\".");
+                    safeThis->owner.savePersistedState(); // Save :)
                 });
-            
-                owner.savePersistedState(); //Save :)
+
+            auto& box = juce::CallOutBox::launchAsynchronously(std::move(picker), addButton.getScreenBounds(), nullptr);
+
+            juce::ignoreUnused(box);
         }
 
         void handleSettingsClicked()
@@ -415,8 +544,6 @@ namespace plugitwin
                     }),
                 true);
             }
-
-            setStatusText("Adjust input/output devices. Close the dialog when done.");
         }
 
         TrayApplication& owner;
