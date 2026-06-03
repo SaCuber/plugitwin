@@ -225,6 +225,7 @@ namespace plugitwin
                 searchBox.setTextToShowWhenEmpty("Search Plugins...", Colours::searchBarTextColour);
                 searchBox.addListener(this);
                 searchBox.addKeyListener(this);
+                searchBox.onEscapeKey = [this] {dismiss();};
                 searchBox.onReturnKey = [this] {pickCurrent();};
                 addAndMakeVisible(searchBox);
 
@@ -266,20 +267,6 @@ namespace plugitwin
                 if (key == juce::KeyPress::upKey) {moveCurrent(-1); return true;}
                 if (key == juce::KeyPress::pageDownKey) {moveCurrent(+8); return true;}
                 if (key == juce::KeyPress::pageUpKey) {moveCurrent(-8); return true;}
-
-                if (key == juce::KeyPress::escapeKey) {
-                    grabKeyboardFocus();
-                    return true;
-                }
-                return false;
-            }
-
-            bool keyPressed(const juce::KeyPress& key) override
-            {
-                if (key == juce::KeyPress::escapeKey) {dismiss(); return true;}
-                if (key == juce::KeyPress::downKey) {moveCurrent(+1); return true;}
-                if (key == juce::KeyPress::upKey) {moveCurrent(-1); return true;}
-                if (key == juce::KeyPress::returnKey) {pickCurrent(); return true;}
                 return false;
             }
 
