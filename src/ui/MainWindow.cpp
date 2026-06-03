@@ -216,7 +216,7 @@ namespace plugitwin
 
     private:
 
-        struct PluginPickerPopup : public juce::Component, private juce::TextEditor::Listener, private juce::ListBoxModel
+        struct PluginPickerPopup : public juce::Component, private juce::TextEditor::Listener, private juce::ListBoxModel, private juce::KeyListener
         {
             PluginPickerPopup(juce::Array<juce::PluginDescription> descs, std::function<void(const juce::PluginDescription&)> onPick)
                 : allDescriptions(std::move(descs)),
@@ -224,19 +224,26 @@ namespace plugitwin
             {
                 searchBox.setTextToShowWhenEmpty("Search Plugins...", Colours::searchBarTextColour);
                 searchBox.addListener(this);
+                searchBox.addKeyListener(this);
                 searchBox.onReturnKey = [this] {pickCurrent();};
-                searchBox.onEscapeKey = [this] {dismiss();};
-                searchBox.setWantsKeyboardFocus(true);
                 addAndMakeVisible(searchBox);
 
                 list.setModel(this);
                 list.setRowHeight(22);
                 list.setColour(juce::ListBox::backgroundColourId, Colours::mainUIColour);
-                list.setMouseCursor(juce::MouseCursor::PointingHandCursor);
+                list.addMouseListener(this, true);
                 addAndMakeVisible(list);
+
+                setWantsKeyboardFocus(true);
 
                 rebuildFiltered();
                 setSize(320, 360);
+            }
+
+            ~PluginPickerPopup() override
+            {
+                list.removeMouseListener(this);
+                searchBox.removeKeyListener(this);
             }
 
             void resized() override
@@ -249,24 +256,42 @@ namespace plugitwin
 
             void parentHierarchyChanged() override
             {
-                if (isShowing() && !searchBox.hasKeyboardFocus(true)) searchBox.grabKeyboardFocus();
+                if (isShowing() && !searchBox.hasKeyboardFocus(true) && !hasKeyboardFocus(true)) searchBox.grabKeyboardFocus();
             }
 
-            bool keyPressed(const juce::KeyPress& key) override
+            bool keyPressed(const juce::KeyPress& key, juce::Component* source) override
             {
+                if (source != &searchBox) return false;
                 if (key == juce::KeyPress::downKey) {moveCurrent(+1); return true;}
                 if (key == juce::KeyPress::upKey) {moveCurrent(-1); return true;}
                 if (key == juce::KeyPress::pageDownKey) {moveCurrent(+8); return true;}
                 if (key == juce::KeyPress::pageUpKey) {moveCurrent(-8); return true;}
+
+                if (key == juce::KeyPress::escapeKey) {
+                    grabKeyboardFocus();
+                    return true;
+                }
                 return false;
+            }
+
+            bool keyPressed(const juce::KeyPress& key) override
+            {
+                if (key == juce::KeyPress::escapeKey) {dismiss(); return true;}
+                if (key == juce::KeyPress::downKey) {moveCurrent(+1); return true;}
+                if (key == juce::KeyPress::upKey) {moveCurrent(-1); return true;}
+                if (key == juce::KeyPress::returnKey) {pickCurrent(); return true;}
+                return false;
+            }
+
+            juce::MouseCursor getMouseCursorForRow(int) override
+            {
+                return juce::MouseCursor::PointingHandCursor;
             }
 
             void mouseMove(const juce::MouseEvent& e) override
             {
                 updateHoverFromScreenPos(e.getScreenPosition());
             }
-
-            void mouseExit(const juce::MouseEvent&) override {};
 
             void textEditorTextChanged(juce::TextEditor&) override
             {
@@ -275,11 +300,11 @@ namespace plugitwin
 
             int getNumRows() override {return filtered.size();}
 
-            void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool rowIsSelected) override
+            void paintListBoxItem(int rowNumber, juce::Graphics& g, int width, int height, bool) override
             {
                 if (rowNumber<0 || rowNumber > filtered.size()) return;
 
-                if (rowIsSelected) g.fillAll(Colours::searchHighlightColour);
+                if (rowNumber == currentRow) g.fillAll(Colours::searchHighlightColour);
 
                 g.setColour(Colours::addListItemTextColour);
                 g.setFont((float) height * 0.6f);
@@ -309,7 +334,7 @@ namespace plugitwin
             {
                 if (row == currentRow) return;
                 currentRow = row;
-                list.selectRow(row, false, true);
+                if (row >= 0) list.selectRow(row, false, true);
                 list.repaint();
             }
 
