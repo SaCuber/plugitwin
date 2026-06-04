@@ -37,6 +37,7 @@ target_sources(PlugitWin PRIVATE
     src/PluginHost.h
     src/PluginHost.cpp
     src/ui/Colours.h
+    src/ui/StartupShortcut.h
     src/ui/MainWindow.h
     src/ui/MainWindow.cpp
     src/ui/PluginChainView.h

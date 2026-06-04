@@ -6,6 +6,7 @@
 #include "../PluginChain.h"
 #include "../PluginHost.h"
 #include "PluginChainView.h"
+#include "StartupShortcut.h"
 
 namespace plugitwin
 {
@@ -512,6 +513,40 @@ namespace plugitwin
                 {
                     addAndMakeVisible(selector);
 
+                    runOnStartupToggle.setButtonText("Run on Startup");
+                    runOnStartupToggle.setTooltip("Toggles whether PlugitWin runs on startup so you don't have to open it manually every time you boot your PC");
+
+                    auto& props = owner.getSettings().getProps();
+                    const bool savedPref = props.getBoolValue("runOnStartup", false);
+                    const bool linkExists = StartupShortcut::shortcutExists();
+                    runOnStartupToggle.setToggleState(savedPref && linkExists, juce::dontSendNotification);
+
+                    runOnStartupToggle.onClick = [this, safeThis]
+                    {
+                        const bool wantOn = runOnStartupToggle.getToggleState();
+                        const bool ok = wantOn ? StartupShortcut::enable() : StartupShortcut::disable();
+
+                        auto& p = owner.getSettings().getProps();
+                        p.setValue("runOnStartup", wantOn);
+                        owner.savePersistedState();
+
+                        if (safeThis != nullptr)
+                        {
+                            if (!ok)
+                            {
+                                safeThis->setStatusText(wantOn?"Couldn't create Startup shortcut.":"Couldn't remove Startup shortcut.");
+
+                                runOnStartupToggle.setToggleState(
+                                    StartupShortcut::shortcutExists(), juce::dontSendNotification);
+                            }
+                            else
+                            {
+                                safeThis->setStatusText(wantOn?"PlugitWin will run on startup.":"PlugitWin will no longer run on startup.");
+                            }
+                        }
+                    };
+                    addAndMakeVisible(runOnStartupToggle);
+
                     resetButton.setButtonText("Reset config");
                     resetButton.setTooltip("Erase EVERYTHING, BE CAREFUL!");
                     resetButton.setColour(juce::TextButton::buttonColourId, Colours::resetButtonColour);
@@ -527,12 +562,14 @@ namespace plugitwin
                     auto area = getLocalBounds();
                     auto bottom = area.removeFromBottom(40).reduced(12,6);
                     resetButton.setBounds(bottom.removeFromRight(130));
+                    runOnStartupToggle.setBounds(bottom.removeFromLeft(160));
                     selector.setBounds(area);
                 }
 
                 TrayApplication&                    owner;
                 juce::AudioDeviceSelectorComponent  selector;
                 juce::TextButton                    resetButton;
+                juce::ToggleButton                  runOnStartupToggle;
             };
             
             juce::Component::SafePointer<Content> safeThis(this);

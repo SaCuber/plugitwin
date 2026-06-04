@@ -4,6 +4,7 @@
 #include "PluginChain.h"
 #include "PluginHost.h"
 #include "ui/MainWindow.h"
+#include "ui/StartupShortcut.h"
 
 namespace plugitwin
 {
@@ -157,6 +158,11 @@ namespace plugitwin
             if (chainXml.isNotEmpty()) {
                 pluginChain->restoreStateFromXml(chainXml);
             }
+        }
+
+        {
+            const bool runOnStartup = props.getBoolValue("runOnStartup", false);
+            StartupShortcut::apply(runOnStartup);
         }
     }
 
