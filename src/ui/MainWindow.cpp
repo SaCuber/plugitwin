@@ -558,12 +558,14 @@ namespace plugitwin
                 }
 
                 void resized() override
-                {
+                {   
+                    if (auto* peer = getPeer()) peer->setCurrentRenderingEngine(0);
                     auto area = getLocalBounds();
                     auto bottom = area.removeFromBottom(40).reduced(12,6);
                     resetButton.setBounds(bottom.removeFromRight(130));
                     runOnStartupToggle.setBounds(bottom.removeFromLeft(160));
                     selector.setBounds(area);
+                    repaint();
                 }
 
                 TrayApplication&                    owner;
