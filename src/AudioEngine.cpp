@@ -109,9 +109,6 @@ namespace plugitwin
 
     juce::String AudioEngine::openDevices(const AudioDeviceSettings& s)
     {
-        //Only allow Windows Audio, no support for ASIO or others
-        deviceManager.setCurrentAudioDeviceType("Windows Audio", /*treatAsChosen*/ true);
-
         if (savedDeviceState != nullptr)
         {
             const auto error = deviceManager.initialise(
