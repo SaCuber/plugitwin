@@ -20,6 +20,7 @@ namespace plugitwin
 
         juce::XmlElement root("PLUGIN_SCAN_RESULT");
         for (auto* desc : found) {
+            if (desc->isInstrument) continue;
             auto child = desc->createXml();
             if (child != nullptr) root.addChildElement(child.release());
         }
