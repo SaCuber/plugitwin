@@ -181,7 +181,7 @@ namespace plugitwin
             for (const auto& d : known)
             {
                 if (d.pluginFormatName  == formatName
-                    && d.fileOrIdentifier == fileOrId
+                    && fileOrId.contains(d.fileOrIdentifier)
                     && (int) d.uniqueId   == uniqueId)
                 {
                     match = &d;
